@@ -15,7 +15,7 @@
     var check_handle = 0;
     var wait_time_minutes;
     var wait_time_milliseconds;
-  
+    var check_num = 0;
 
     var num_buzzes=5;
     var buzz_delay = 600;
@@ -69,6 +69,7 @@
       }
       minute_check_times = new Array();
       current_time = 0;
+      check_num = 0;
       reality_check_time = 0;
       //returns a random number between 0 (inclusive) and 60 (exclusive)
         while (minute_check_times.length < checks_per_period) {
@@ -78,41 +79,48 @@
           }
         }
       //sort from last check to first check, popping from lowest to highest
-      minute_check_times.sort(function(a, b){return b-a;});  
+      minute_check_times.sort(function(a, b){return b-a;});
+      // write
+      require("Storage").write("dreamcheck.data", minute_check_times.toString());
+      // read
+      //array = new Float32Array(JSON.parse(fs.readFileSync("foo.txt")));  
     }
     
 
+    function start_period(){
+      init_new_period();
+      reality_check_time = minute_check_times.pop();
+      wait_time_minutes = reality_check_time - current_time;
+      wait_time_milliseconds = wait_time_minutes * milliseconds_in_minute;
+      check_handle = setTimeout(reality_check,wait_time_milliseconds);
+    }
+
+    function end_period(){
+      wait_time_minutes = period_in_minutes - current_time;
+      wait_time_milliseconds = wait_time_minutes * milliseconds_in_minute;
+      check_handle = setTimeout(start_period,wait_time_milliseconds);
+    }
+
+
     function reality_check(){
-        if(reality_check_time > 0){
-          current_time = reality_check_time;
-          Bangle.setLCDPower(1);
-          dream_cue_check();
-          }
-          if(minute_check_times.length != 0){ 
-            reality_check_time = minute_check_times.pop();
-            wait_time_minutes = reality_check_time - current_time;
-            wait_time_milliseconds = wait_time_minutes * milliseconds_in_minute;
-            check_handle = setTimeout(reality_check,wait_time_milliseconds);
-          }
-          else{
-            reality_check_time = 0;
-            wait_time_minutes = period_in_minutes - current_time;
-            wait_time_milliseconds = wait_time_minutes * milliseconds_in_minute;
-            init_new_period(); 
-            check_handle = setTimeout(reality_check,wait_time_milliseconds);
-          }
-        Bangle.drawWidgets();
+      current_time = reality_check_time;
+      Bangle.setLCDPower(1);
+      dream_cue_check();
+      check_num = check_num + 1;
+
+      if(minute_check_times.length != 0){ 
+        reality_check_time = minute_check_times.pop();
+        wait_time_minutes = reality_check_time - current_time;
+        wait_time_milliseconds = wait_time_minutes * milliseconds_in_minute;
+        check_handle = setTimeout(reality_check,wait_time_milliseconds);
       }
+      else{
+        end_period();
+      }
+      Bangle.drawWidgets();
+    }
 
-  
-      reload();
-      if ((on==true) && (check_handle==0)){    
-        init_new_period();
-        reality_check();
-      } 
-  
-
-  
+   
     // add your widget
   
       function turn_off(){
@@ -129,9 +137,7 @@
       function turn_on(){
         reload();
         on = true;
-        init_new_period();
-        reality_check();
-
+        start_period();
        } 
   
  
@@ -146,10 +152,10 @@
         g.setColor(.1,.1, 1);
         g.setColor(.5,.5, .5); //gray
         g.setColor(1,0.87,0.68); //gray
-        //var text = "Dreaming?:" + reality_check_time;
+        var text = current_time + "-" + check_num;
         if (on==true){   
 
-          //g.drawString(text, this.x+width/2+15, this.y+12);
+          g.drawString(text, this.x+width/2+15, this.y+12);
           g.drawImage(atob("PUQBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/wAAAAAAAP//AAAAAAA/AD8AAAAAB8AAPgAAAABwP/A4AAAABw//8OAAAADh9zvhwAAADjwww8cAAABjgwMHGAAABj4YGHxgAABj/MDP8YAABzh8A+HOAAAzgOAcBzAAAxwDgcA4wAAZsB4eA2YAAY2A+fAbGAAMxgb9gYzAAGYwE8gMZgAGYMDMwMGYADMf/mf/jMABn//////mAAz4cf+OHzAAZwHH+OA5gAMwB//8AMwAGYAf/+AGYADMAf//gDMABnAcf44DmAAz8cf+OPzAAZv/////ZgAMw/+Z/8MwADMcDewOMwABmMDPMDGYAAzMBs2AzMAAM2A+fAbMAAGfAeHgPmAABnAOBwDmAAAxgeAeBjAAAMY/gfxjAAAHP8wM/zgAABxwYGDjgAAAccOHDjgAAAHHjDHjgAAADw/z/DwAAAB+H/+H4AAAAzwHgPMAAAAY+AAfGAAAAMD/P8DAAAAGAf/4BgAAADAAMAAwAAABgAPAAYAAAAwAPwAMAAAAcAGYAOAAAAfAD8APgAAANgA8AGwAAAMwAMADMAAAGIAPABGAAADMAHgAzAAAA2ADwAbAAAAbAB4ANgAAAPgA8AHwAAADgAeABwAAAAgAGAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"), this.x+66, this.y-40);
         }
        
@@ -166,7 +172,11 @@
       buzz:buzz
     }; 
   
-
+    reload();
+    if ((on==true) && (check_handle==0)){    
+      start_period();
+    } 
+    setWatch(dream_cue_check, BTN4, {edge: "rising", debounce: 50, repeat: true});
   
   })()  
   
